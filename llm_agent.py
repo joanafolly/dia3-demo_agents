@@ -1,43 +1,29 @@
 from groq import Groq
-
 from dotenv import load_dotenv
 import os
 
 load_dotenv()
 
+MODEL_NAME = "openai/gpt-oss-120b"
+MAX_HISTORY_MESSAGES = 20  # mémoire : on garde les 20 derniers messages
 
 
 def read_file(file_path):
-    with open(file_path, "r") as file:
+    with open(file_path, "r", encoding="utf-8") as file:
         return file.read()
 
 
-def ask_llm(question):
-    
-    client = Groq(api_key=os.environ["GROQ_KEY"])
+SYSTEM_PROMPT = read_file(file_path="./context.txt")
+client = Groq(api_key=os.environ["GROQ_KEY"])
+
+
+def ask_llm(history):
+    """history = liste des messages [{"role": ..., "content": ...}]"""
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history[-MAX_HISTORY_MESSAGES:]
 
     chat_completion = client.chat.completions.create(
-        messages=[
-            {
-                "role": "system",
-                "content": read_file(file_path="./context.txt")
-            },
-            {
-                "role": "user",
-                "content": question,
-            }
-        ],
-        model="openai/gpt-oss-120b",
+        messages=messages,
+        model=MODEL_NAME,
         include_reasoning=False,
     )
-
-
-    response = chat_completion.choices[0].message.content
-    return response
-
-
-if __name__ == "__main__":
-    question = input("Pose ta question :\n")
-    response = ask_llm(question)
-    print("\n")
-    print(response)
+    return chat_completion.choices[0].message.content
