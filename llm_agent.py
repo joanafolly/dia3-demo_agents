@@ -1,29 +1,47 @@
 from groq import Groq
+
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
 
-MODEL_NAME = "openai/gpt-oss-120b"
-MAX_HISTORY_MESSAGES = 20  # mémoire : on garde les 20 derniers messages
+class ConversationAgent:
+    def __init__(self):
+        load_dotenv()
+        self.groq_client = Groq(api_key=os.environ["GROQ_KEY"])
+        self.conversation_history = [
+            {
+                "role": "system",
+                "content": self.read_file(file_path="./context.txt"),
+            }
+        ]
 
+    @staticmethod
+    def read_file(file_path):
+        with open(file_path, "r", encoding="utf-8") as file:
+            return file.read()
 
-def read_file(file_path):
-    with open(file_path, "r", encoding="utf-8") as file:
-        return file.read()
+    def get_conversation_history(self):
+        return self.conversation_history[1:]
 
+    def update_conversation_history(self, role, content):
+        self.conversation_history.append({"role": role, "content": content})
 
-SYSTEM_PROMPT = read_file(file_path="./context.txt")
-client = Groq(api_key=os.environ["GROQ_KEY"])
+    def transcribe_audio(self, audio_file):
+        transcription = self.groq_client.audio.transcriptions.create(
+            file=("audio.wav", audio_file.read()),
+            model="whisper-large-v3-turbo",
+            language="pt",
+        )
+        return transcription.text
 
+    def ask_llm(self, text_interaction):
+        self.update_conversation_history(role="user", content=text_interaction)
 
-def ask_llm(history):
-    """history = liste des messages [{"role": ..., "content": ...}]"""
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history[-MAX_HISTORY_MESSAGES:]
+        response = self.groq_client.chat.completions.create(
+            messages=self.conversation_history,
+            model="openai/gpt-oss-120b",
+            include_reasoning=False,
+        ).choices[0].message.content
 
-    chat_completion = client.chat.completions.create(
-        messages=messages,
-        model=MODEL_NAME,
-        include_reasoning=False,
-    )
-    return chat_completion.choices[0].message.content
+        self.update_conversation_history(role="assistant", content=response)
+        return response
