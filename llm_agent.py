@@ -31,45 +31,32 @@ class ConversationAgent:
         return self.conversation_history[1: ]
 
 
-    def update_conversation_history(self, role, content, image=None):
-        if content and image:
-            self.conversation_history.append(
-                {
-                "role": role,
-                "content": [
-                    {"type": "text", "text": content},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{self.encode_image(image)}",
-                        },
-                    },
-                ],
-                }
-            )
-        elif content and not image :
-            self.conversation_history.append(
-                {
-                "role": role,
-                "content": content,
-                }
-            )
-        elif not content and image :
-            self.conversation_history.append(
-                {
-                "role": role,
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{self.encode_image(image)}",
-                        },
-                    },
-                ],
-                }
-            )
+    @staticmethod
+    def build_content(text_interaction, image=None):
+        content = []
+        if text_interaction:
+            content.append({
+                            "type": "text",
+                            "text": text_interaction
+                        })
+        if image :
+            content.append({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{ConversationAgent.encode_image(image)}",
+                            },
+                        })
+
+        return content
 
 
+    def update_conversation_history(self, role, text_interaction, image=None):
+        self.conversation_history.append(
+            {
+            "role": role,
+            "content": self.build_content(text_interaction, image),
+            }
+        )
 
 
 
@@ -86,9 +73,11 @@ class ConversationAgent:
         return transcription.text
 
 
+
+
     def ask_llm(self, text_interaction, image):
 
-        self.update_conversation_history(role="user", content=text_interaction, image=image)
+        self.update_conversation_history(role="user", text_interaction=text_interaction, image=image)
 
         response = self.groq_client.chat.completions.create(
             messages=self.conversation_history,
@@ -97,7 +86,7 @@ class ConversationAgent:
         ).choices[0].message.content
 
 
-        self.update_conversation_history(role="assistant", content=response)
+        self.update_conversation_history(role="assistant", text_interaction=response)
 
 
 
